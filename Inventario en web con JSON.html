@@ -1,0 +1,921 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sistema de Inventariado Inteligente - Well Testing</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh; padding: 20px;
+    }
+    .container { max-width: 1400px; margin: 0 auto; background: #fff; border-radius: 20px; box-shadow: 0 20px 40px rgba(0,0,0,.1); overflow: hidden; }
+    .header { background: linear-gradient(135deg, #2c3e50, #3498db); color: #fff; padding: 30px; text-align: center; }
+    .header h1 { font-size: 2.5rem; margin-bottom: 10px; font-weight: 300; }
+    .header p { opacity: .9; font-size: 1.1rem; }
+    .main-content { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; padding: 40px; }
+    .input-section { background: #f8f9fa; padding: 30px; border-radius: 15px; border-left: 5px solid #3498db; }
+    .results-section { background: #fff; padding: 30px; border-radius: 15px; border: 1px solid #e9ecef; max-height: 80vh; overflow-y: auto; }
+    .section-title { color: #2c3e50; font-size: 1.5rem; margin-bottom: 25px; font-weight: 600; display: flex; align-items: center; gap: 10px; }
+    .form-group { margin-bottom: 25px; }
+    .form-group label { display: block; margin-bottom: 8px; color: #2c3e50; font-weight: 600; }
+    .form-group input, .form-group select { width: 100%; padding: 12px 15px; border: 2px solid #e9ecef; border-radius: 8px; font-size: 1rem; transition: all .3s ease; }
+    .form-group input:focus, .form-group select:focus { border-color: #3498db; outline: none; box-shadow: 0 0 0 3px rgba(52,152,219,.1); }
+    .btn-analyze { width: 100%; padding: 15px; background: linear-gradient(135deg, #3498db, #2980b9); color: #fff; border: none; border-radius: 8px; font-size: 1.1rem; font-weight: 600; cursor: pointer; transition: all .3s ease; margin-top: 20px; }
+    .btn-analyze:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(52, 152, 219, .3); }
+    .btn-analyze:active { transform: translateY(0); }
+
+    .equipment-category { background: #fff; border: 1px solid #e9ecef; border-radius: 12px; margin-bottom: 25px; overflow: hidden; box-shadow: 0 2px 10px rgba(0,0,0,.05); }
+    .category-header { background: linear-gradient(135deg, #34495e, #2c3e50); color: #fff; padding: 15px 20px; font-weight: 600; display: flex; align-items: center; justify-content: space-between; }
+    .category-content { padding: 20px; }
+    .equipment-item { display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid #f8f9fa; gap: 16px; }
+    .equipment-item:last-child { border-bottom: none; }
+    .equipment-main { display: flex; align-items: center; gap: 10px; }
+    .equipment-name { font-weight: 600; color: #2c3e50; }
+    .equipment-specs { font-size: .85rem; color: #7f8c8d; margin-top: 3px; }
+    .quantity-badge { background: #3498db; color: #fff; padding: 4px 12px; border-radius: 20px; font-size: .85rem; font-weight: 700; white-space: nowrap; }
+    .recommended-badge { background: #e67e22; }
+
+    .alert { padding: 15px 20px; border-radius: 8px; margin-bottom: 20px; border-left: 4px solid; }
+    .alert-info { background: #e3f2fd; border-color: #2196f3; color: #1565c0; }
+    .alert-warning { background: #fff3e0; border-color: #ff9800; color: #e65100; }
+
+    .summary-box { background: linear-gradient(135deg, #667eea, #764ba2); color: #fff; padding: 20px; border-radius: 12px; margin-bottom: 25px; text-align: center; }
+    .summary-item { display: inline-block; margin: 0 15px; }
+    .summary-number { font-size: 2rem; font-weight: 800; display: block; }
+    .summary-label { font-size: .9rem; opacity: .9; }
+
+    .no-results { text-align: center; color: #7f8c8d; font-style: italic; padding: 40px; }
+    .note-box { background: #fef9e7; border: 1px solid #f1c40f; border-radius: 8px; padding: 15px; margin-top: 20px; font-size: .9rem; color: #856404; }
+    .loading { display: none; text-align: center; padding: 20px; color: #3498db; }
+
+    .icon { width: 24px; height: 24px; fill: currentColor; }
+
+    /* Tooltip de imagen */
+    .thumb { width: 100px; height: 100px; border-radius: 8px; object-fit: cover; border: 1px solid #e0e0e0; background: #fafafa; }
+    .thumb-wrap { position: relative; display: inline-flex; align-items: center; }
+    .thumb-tooltip {
+      --w: 1024px; --h: 860px;
+      position: fixed; z-index: 50; left: 50%; transform: translateX(-50%) translateY(-8px);
+      top: -8px; display: none; width: var(--w); height: var(--h);
+      padding: 6px; border-radius: 10px; background: #fff; box-shadow: 0 10px 30px rgba(0,0,0,.35);
+    }
+    .thumb-tooltip img { width: 100%; height: 100%; object-fit: contain; background: #fff; border-radius: 6px; }
+    .thumb-tooltip::after { content: ""; position: fixed; bottom: -6px; left: 50%; transform: translateX(-50%);
+      border-width: 6px; border-style: solid; border-color: #111 transparent transparent transparent; }
+    .thumb-wrap:hover .thumb-tooltip { display: block; }
+
+    /* Botones de exportación */
+    .export-buttons { display: flex; gap: 10px; margin-bottom: 20px; }
+    .export-btn { padding: 10px 15px; border: none; border-radius: 6px; font-weight: 600; cursor: pointer; transition: all 0.3s; display: flex; align-items: center; gap: 8px; }
+    .export-btn:hover { transform: translateY(-2px); box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
+    .export-btn.csv { background: #27ae60; color: white; }
+    .export-btn.pdf { background: #e74c3c; color: white; }
+    .export-btn.inventory { background: #3498db; color: white; }
+
+    /* Modal para gestión de inventario */
+    .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 1000; justify-content: center; align-items: center; }
+    .modal-content { background: white; border-radius: 12px; width: 90%; max-width: 800px; max-height: 80vh; overflow-y: auto; padding: 25px; box-shadow: 0 10px 30px rgba(0,0,0,0.3); }
+    .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding-bottom: 15px; border-bottom: 1px solid #eee; }
+    .modal-header h2 { color: #2c3e50; }
+    .close-modal { background: none; border: none; font-size: 24px; cursor: pointer; color: #7f8c8d; }
+    .modal-tabs { display: flex; gap: 5px; margin-bottom: 20px; border-bottom: 1px solid #eee; }
+    .modal-tab { padding: 10px 15px; background: #f8f9fa; border: none; border-radius: 5px 5px 0 0; cursor: pointer; }
+    .modal-tab.active { background: #3498db; color: white; }
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+    .json-editor { width: 100%; height: 300px; font-family: monospace; padding: 15px; border: 1px solid #ddd; border-radius: 5px; resize: vertical; }
+    .modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; }
+    .modal-btn { padding: 10px 20px; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; }
+    .modal-btn.primary { background: #3498db; color: white; }
+    .modal-btn.secondary { background: #e9ecef; color: #2c3e50; }
+
+    @media (max-width: 1024px) { .main-content { grid-template-columns: 1fr; gap: 30px; } }
+  </style>
+  <!-- Biblioteca para generar PDF -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>Sistema de Inventariado Inteligente</h1>
+      <p>Well Testing - Recomendaciones Automáticas de Equipos</p>
+    </div>
+
+    <div class="main-content">
+      <div class="input-section">
+        <h2 class="section-title">
+          <svg class="icon" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>
+          Parámetros de la Prueba
+        </h2>
+        <form id="analysisForm">
+          <div class="form-group">
+            <label for="location">Ubicación de Medición</label>
+            <input type="text" id="location" required placeholder="ej: Furrial, Chaima, Maracaibo, etc.">
+          </div>
+          <div class="form-group">
+            <label for="environment">Tipo de Medición</label>
+            <select id="environment" required>
+              <option value="">Seleccionar...</option>
+              <option value="onshore">Onshore</option>
+              <option value="offshore">Offshore</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="pressure">Presión del Yacimiento (PSI)</label>
+            <input type="number" id="pressure" min="0" max="5000" required placeholder="ej: 850">
+          </div>
+          <div class="form-group">
+            <label for="oilType">Tipo de Crudo</label>
+            <select id="oilType" required>
+              <option value="">Seleccionar tipo...</option>
+              <option value="ligero">Crudo Ligero (> 31.1° API)</option>
+              <option value="medio">Crudo Medio (22.0° - 29.9° API)</option>
+              <option value="pesado">Crudo Pesado (10.0° - 21.9° API)</option>
+              <option value="extrapesado">Crudo Extrapesado (< 10.0° API)</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="minBarrels">Barriles Mínimos Estimados (BOPD)</label>
+            <input type="number" id="minBarrels" min="0" required placeholder="ej: 200">
+          </div>
+          <div class="form-group">
+            <label for="maxBarrels">Barriles Máximos Estimados (BOPD)</label>
+            <input type="number" id="maxBarrels" min="0" required placeholder="ej: 800">
+          </div>
+          <div class="form-group">
+            <label for="testDuration">Tiempo Estimado de Medición (días)</label>
+            <input type="number" id="testDuration" min="1" max="3600" required placeholder="ej: 5">
+          </div>
+          <button type="submit" class="btn-analyze" id="analyzeBtn">
+            <svg class="icon" viewBox="0 0 24 24" style="display:inline-block;margin-right:8px;width:20px;height:20px;">
+              <path d="M9 11H7v2h2v-2zm4 0h-2v2h2v-2zm4 0h-2v2h2v-2zm2-7h-1V2h-2v2H8V2H6v2H5c-1.1 0-1.99.9-1.99 2L3 20c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V9h14v11z"/>
+            </svg>
+            <span id="btnText">Generar Recomendaciones</span>
+          </button>
+        </form>
+      </div>
+
+      <div class="results-section">
+        <h2 class="section-title">
+          <svg class="icon" viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zM9 17H7v-7h2v7zm4 0h-2V7h2v10zm4 0h-2v-4h2v4z"/></svg>
+          Recomendaciones de Equipos
+        </h2>
+        <div class="export-buttons" id="exportButtons" style="display: none;">
+          <button class="export-btn csv" id="exportCSV">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+              <polyline points="14 2 14 8 20 8"></polyline>
+              <path d="M16 13H8"></path>
+              <path d="M16 17H8"></path>
+              <polyline points="10 9 9 9 8 9"></polyline>
+            </svg>
+            Exportar CSV
+          </button>
+          <button class="export-btn pdf" id="exportPDF">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+              <polyline points="14 2 14 8 20 8"></polyline>
+              <path d="M16 13H8"></path>
+              <path d="M16 17H8"></path>
+              <polyline points="10 9 9 9 8 9"></polyline>
+            </svg>
+            Exportar PDF
+          </button>
+          <button class="export-btn inventory" id="manageInventory">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path>
+            </svg>
+            Gestionar Inventario
+          </button>
+        </div>
+        <div class="loading" id="loading"><p>🔄 Generando recomendaciones...</p></div>
+        <div id="results"><div class="no-results">Complete los parámetros y presione "Generar Recomendaciones" para ver los equipos sugeridos.</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal para gestión de inventario -->
+  <div class="modal" id="inventoryModal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2>Gestión de Inventario</h2>
+        <button class="close-modal" id="closeModal">&times;</button>
+      </div>
+      <div class="modal-tabs">
+        <button class="modal-tab active" data-tab="json">Editor JSON</button>
+        <button class="modal-tab" data-tab="help">Ayuda</button>
+      </div>
+      <div class="tab-content active" id="jsonTab">
+        <p>Edita los datos del inventario en formato JSON. Los cambios se guardarán en el almacenamiento local del navegador.</p>
+        <textarea class="json-editor" id="jsonEditor"></textarea>
+      </div>
+      <div class="tab-content" id="helpTab">
+        <h3>Estructura del Inventario</h3>
+        <p>El inventario debe seguir esta estructura JSON:</p>
+        <pre>
+{
+  "separators": [
+    {
+      "id": "sep_01",
+      "name": "Separador Bifásico N°01",
+      "type": "bifásico",
+      "workingPressure": 548,
+      "operatingPressure": 450,
+      "capacity_light": 8.70,
+      "capacity_medium": 4.35,
+      "capacity_heavy": 1.24,
+      "gasCapacity": 5.60
+    }
+  ],
+  "mpfm": [...],
+  "tools": {...},
+  "specialEquipment": {...}
+}
+        </pre>
+        <p><strong>Nota:</strong> Los cambios se aplicarán inmediatamente después de guardar.</p>
+      </div>
+      <div class="modal-actions">
+        <button class="modal-btn secondary" id="resetInventory">Restablecer Valores Predeterminados</button>
+        <button class="modal-btn primary" id="saveInventory">Guardar Cambios</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // === Config ===
+    const IMAGES_BASE = 'imagenes/'; // Directorio sugerido
+
+    // Mapa de imágenes por ID/Nombre. Ajusta los nombres de archivo según tus assets.
+    const imageMap = {
+      // Separadores
+      'sep_01': 'sep_01.png',
+      'sep_02': 'sep_02.png',
+      'sep_03': 'sep_03.png',
+      'sep_04': 'sep_04.png',
+      'sep_05': 'sep_05.png',
+      'sep_06': 'sep_06.png',
+      'sep_07': 'sep_07.png',
+      // MPFM
+      'mpfm_35_01': 'mpfm_35_01.png',
+      'mpfm_35_02': 'mpfm_35_02.png',
+      'mpfm_50': 'mpfm_50.png',
+      'mpfm_87_01': 'mpfm_87_01.png',
+      'mpfm_87_02': 'mpfm_87_02.png',
+      // Herramientas (ejemplo por nombre exacto)
+      'Densímetro Anton Para DMA 35N': 'densimetro_dma35.png'
+    };
+
+    function getImageSrc(key) {
+      const file = imageMap[key];
+      return file ? (IMAGES_BASE + file) : null;
+    }
+
+    // === Base de datos (igual a tu versión, con trifásico marcado "offshore") ===
+    const defaultEquipmentDatabase = {
+      separators: [
+        { id: 'sep_01', name: 'Separador Bifásico N°01', type: 'bifásico', workingPressure: 548, operatingPressure: 450, capacity_light: 8.70, capacity_medium: 4.35, capacity_heavy: 1.24, gasCapacity: 5.60 },
+        { id: 'sep_02', name: 'Separador Bifásico N°02', type: 'bifásico', workingPressure: 548, operatingPressure: 450, capacity_light: 8.70, capacity_medium: 4.35, capacity_heavy: 1.24, gasCapacity: 5.60 },
+        { id: 'sep_03', name: 'Separador Bifásico N°03', type: 'bifásico', workingPressure: 713.8, operatingPressure: 690, capacity_light: 14.27, capacity_medium: 7.14, capacity_heavy: 2.04, gasCapacity: 5.60 },
+        { id: 'sep_04', name: 'Separador Bifásico N°04', type: 'bifásico', workingPressure: 548, operatingPressure: 520, capacity_light: 8.70, capacity_medium: 4.35, capacity_heavy: 1.24, gasCapacity: 5.60 },
+        { id: 'sep_05', name: 'Separador Bifásico N°05', type: 'bifásico', workingPressure: 713.8, operatingPressure: 690, capacity_light: 14.27, capacity_medium: 7.14, capacity_heavy: 2.04, gasCapacity: 5.60 },
+        { id: 'sep_06', name: 'Separador Bifásico N°06', type: 'bifásico', workingPressure: 713.8, operatingPressure: 690, capacity_light: 14.27, capacity_medium: 7.14, capacity_heavy: 2.04, gasCapacity: 5.60 },
+        { id: 'sep_07', name: 'Separador Trifásico N°07 (Offshore)', type: 'trifásico', workingPressure: 1000, operatingPressure: 900, capacity_light: 3.92, capacity_medium: 1.96, capacity_heavy: 0.78, gasCapacity: 5.60, special: 'offshore' }
+      ],
+      mpfm: [
+        { id: 'mpfm_35_01', name: 'MPFM Roxar 2600 ID-35mm (MPFM-2848-18)', internalDiameter: 35, maxPressure: 1500, maxCapacity: 500, uncertainty_gas: 6, uncertainty_oil: 3, uncertainty_water: 2 },
+        { id: 'mpfm_35_02', name: 'MPFM Roxar 2600 ID-35mm (MPFM-2835-18)', internalDiameter: 35, maxPressure: 1500, maxCapacity: 500, uncertainty_gas: 6, uncertainty_oil: 3, uncertainty_water: 2 },
+        { id: 'mpfm_50', name: 'MPFM Roxar 2600 ID-50mm (MPFM-2514-17)', internalDiameter: 50, maxPressure: 5000, maxCapacity: 1000, uncertainty_gas: 6, uncertainty_oil: 3, uncertainty_water: 2 },
+        { id: 'mpfm_87_01', name: 'MPFM Roxar 2600 ID-87mm (MPFM-2280-15)', internalDiameter: 87, maxPressure: 2204.57, maxCapacity: 1500, uncertainty_gas: 6, uncertainty_oil: 3, uncertainty_water: 2 },
+        { id: 'mpfm_87_02', name: 'MPFM Roxar 2600 ID-87mm (MPFM-2172-13)', internalDiameter: 87, maxPressure: 2204.57, maxCapacity: 1500, uncertainty_gas: 6, uncertainty_oil: 3, uncertainty_water: 2 }
+      ],
+      tools: {
+        ajustes_medicion: [
+          'Alicate de presión', 'Alicate manual', 'Juegos de dados (1/4", 1/2")', 'Juegos de destornilladores', 'Llaves Allen y combinadas',
+          'Llaves de golpe (1 1/16", 1 1/8", 1 1/4")', 'Llaves de tubo (12", 36")', 'Extensiones para rachet', 'Rachet 1/2" y 1/4"',
+          'Multímetro', 'Vernier'
+        ],
+        analisis_monitoreo: [
+          'Detector de gases con 2 baterías', 'Densímetro Anton para DMA 35N', 'Radiómetro', 'Transmisor de presión', 'Probetas',
+          'Cilindro graduado plástico 1000mL', 'Porta provetas'
+        ],
+        instalacion_operacion: [
+          'Barra de cobre con perno', 'Baterías 1000 AMP', 'Bidón 60 litros', 'Bolsa de trapos', 'Breakers 40AMP a 110V', 'Burros para tuberías',
+          'Cadena', 'Cinta de seguridad', 'Codos de unión de golpe 3"', 'Conos de seguridad', 'Espárragos de 3/4"', 'Flange 3" ANSI 300 ciega',
+          'Hammer Union Seal 2" y 3"', 'Mangueras (1", 2")', 'Mecate', 'Escalera', 'Pala'
+        ],
+        conexiones_acoplamiento: [
+          'Crossover 1" brida a 1/2" brida', 'Crossover 1" brida a 1" NPT', 'Crossover 2" brida a 1" brida', 'Crossover brida 3" a unión 3"',
+          'Crossover unión 2" a brida 3"', 'Crossover unión 3" a unión 2"'
+        ],
+        suministro_electrico: [
+          'Convertidor RJ45 a USB', 'Controlador sistema fotovoltaico', 'Extensión para luminaria con toma corriente', 'Fuente alimentación 110V-24V',
+          'Inversor 24VDC a 110V', 'Lámparas LED 107W', 'Paneles solares y base', 'Router con cargador'
+        ],
+        seguridad: [ 'Equipo autocontenido', 'Guantes de carnaza', 'Guantes de puntos', 'Extintor', 'Pilares para cinta de peligro' ],
+        administrativo: [ 'Archivador dos gavetas', 'Escritorio dos gavetas', 'Impresora a color', 'Sillas', 'Porta-termos', 'Termo 48 LTS' ]
+      },
+      specialEquipment: {
+        heavyCrude: [ 'Centrifugadora', 'Higrómetros de 9-21 API', 'Mandarria de bronce (2kg, 5kg)' ],
+        extraHeavyCrude: [ 'Centrifugadora', 'Higrómetros de 9-21 API', 'Sistema de calentamiento', 'Mandarria de bronce (2kg, 5kg)' ],
+        lightCrude: [ 'Densímetro Anton para DMA 35N', 'Choke Manifold' ],
+        longDuration: [ 'Baterías extra para paneles solares', 'Equipos de repuesto básicos', 'Materiales consumibles adicionales' ]
+      }
+    };
+
+    // Cargar base de datos desde localStorage o usar la predeterminada
+    function getEquipmentDatabase() {
+      const storedData = localStorage.getItem('equipmentDatabase');
+      return storedData ? JSON.parse(storedData) : defaultEquipmentDatabase;
+    }
+
+    // Guardar base de datos en localStorage
+    function saveEquipmentDatabase(data) {
+      localStorage.setItem('equipmentDatabase', JSON.stringify(data));
+    }
+
+    // === Motor de recomendaciones ===
+    class RecommendationEngine {
+      constructor() { 
+        this.database = getEquipmentDatabase(); 
+      }
+      
+      refreshDatabase() {
+        this.database = getEquipmentDatabase();
+      }
+      
+      analyze(params) {
+        const recommendations = {
+          separators: this.recommendSeparators(params),
+          mpfm: this.recommendMPFM(params),
+          tools: this.recommendTools(params),
+          alerts: this.generateAlerts(params)
+        };
+        return recommendations;
+      }
+
+      recommendSeparators(params) {
+        const { pressure, oilType, maxBarrels, environment } = params;
+        const suitable = [];
+        const pressureCompatible = this.database.separators.filter(sep => sep.workingPressure >= pressure);
+        const capacityKey = this.getCapacityKey(oilType);
+
+        pressureCompatible.forEach(sep => {
+          // Filtrar equipos marcados solo para OFFSHORE si no se seleccionó OFFSHORE
+          if (sep.special === 'offshore' && environment !== 'offshore') return;
+          const capacity = sep[capacityKey] * 1000; // MBPD -> BOPD
+          if (capacity >= maxBarrels * 0.8) {
+            suitable.push({ ...sep, suitabilityScore: this.calculateSeparatorScore(sep, params), recommendedCapacity: capacity });
+          }
+        });
+        return suitable.sort((a, b) => b.suitabilityScore - a.suitabilityScore);
+      }
+
+      recommendMPFM(params) {
+        const { pressure, maxBarrels } = params;
+        const suitable = [];
+        this.database.mpfm.forEach(mpfm => {
+          if (mpfm.maxPressure >= pressure && mpfm.maxCapacity >= maxBarrels) {
+            suitable.push({ ...mpfm, suitabilityScore: this.calculateMPFMScore(mpfm, params) });
+          }
+        });
+        return suitable.sort((a, b) => b.suitabilityScore - a.suitabilityScore);
+      }
+
+      recommendTools(params) {
+        const { oilType, testDuration } = params;
+        const tools = {
+          ajustes_medicion: [...this.database.tools.ajustes_medicion],
+          analisis_monitoreo: [...this.database.tools.analisis_monitoreo],
+          instalacion_operacion: [...this.database.tools.instalacion_operacion],
+          conexiones_acoplamiento: [...this.database.tools.conexiones_acoplamiento],
+          suministro_electrico: [...this.database.tools.suministro_electrico],
+          seguridad: [...this.database.tools.seguridad],
+          administrativo: [...this.database.tools.administrativo],
+          especiales: []
+        };
+        if (oilType === 'extrapesado') tools.especiales.push(...this.database.specialEquipment.extraHeavyCrude);
+        else if (oilType === 'pesado') tools.especiales.push(...this.database.specialEquipment.heavyCrude);
+        else if (oilType === 'ligero') tools.especiales.push(...this.database.specialEquipment.lightCrude);
+        if (testDuration >= 7) tools.especiales.push(...this.database.specialEquipment.longDuration);
+        return tools;
+      }
+
+      generateAlerts(params) {
+        const alerts = [];
+        const { pressure, maxBarrels, oilType, location, environment } = params;
+        if (pressure > 2000) alerts.push({ type: 'warning', message: `Presión alta detectada (${pressure} PSI). Verificar equipos de seguridad y procedimientos especiales.` });
+        if (maxBarrels > 1500) alerts.push({ type: 'info', message: `Producción alta estimada (${maxBarrels} BOPD). Consultar gráfica envolvente para MPFM seleccionado.` });
+        const locationLower = location.toLowerCase();
+        if ((locationLower.includes('chaima') || locationLower.includes('faja')) && (oilType === 'ligero' || oilType === 'medio')) {
+          alerts.push({ type: 'warning', message: 'Inconsistencia: Chaima/Faja Petrolífera típicamente produce crudo pesado/extrapesado. Verificar datos.' });
+        }
+        if ((locationLower.includes('furrial') || locationLower.includes('maracaibo')) && (oilType === 'pesado' || oilType === 'extrapesado')) {
+          alerts.push({ type: 'warning', message: 'Inconsistencia: Furrial/Maracaibo típicamente produce crudo ligero. Verificar datos.' });
+        }
+        if (environment === 'offshore') {
+          alerts.push({ type: 'info', message: 'Modo Offshore activo. Se priorizan equipos trifásicos y elementos aptos para ambiente marino.' });
+        }
+        if (oilType === 'extrapesado') alerts.push({ type: 'info', message: 'Crudo extrapesado (< 10° API). Se recomiendan equipos especiales para manejo y análisis.' });
+        return alerts;
+      }
+
+      getCapacityKey(oilType) {
+        switch (oilType) {
+          case 'ligero': return 'capacity_light';
+          case 'medio': return 'capacity_medium';
+          case 'pesado':
+          case 'extrapesado': return 'capacity_heavy';
+          default: return 'capacity_medium';
+        }
+      }
+
+      calculateSeparatorScore(separator, params) {
+        let score = 100;
+        const pressureRatio = separator.workingPressure / params.pressure;
+        if (pressureRatio > 2) score -= 20; else if (pressureRatio > 1.5) score -= 10;
+        const capacityKey = this.getCapacityKey(params.oilType);
+        score += separator[capacityKey] * 5;
+        if (separator.operatingPressure >= params.pressure * 1.1) score += 10;
+        return Math.round(score);
+      }
+
+      calculateMPFMScore(mpfm, params) {
+        let score = 100;
+        const capacityRatio = mpfm.maxCapacity / params.maxBarrels;
+        if (capacityRatio >= 1.2 && capacityRatio <= 3) score += 30; else if (capacityRatio >= 1.0) score += 15;
+        score += (10 - mpfm.uncertainty_oil) * 5;
+        const pressureRatio = mpfm.maxPressure / params.pressure;
+        if (pressureRatio >= 1.5) score += 20;
+        return Math.round(score);
+      }
+    }
+
+    const engine = new RecommendationEngine();
+
+    function showLoading() {
+      document.getElementById('loading').style.display = 'block';
+      document.getElementById('results').style.display = 'none';
+      const btn = document.getElementById('analyzeBtn');
+      btn.disabled = true; document.getElementById('btnText').textContent = 'Procesando...';
+    }
+    function hideLoading() {
+      document.getElementById('loading').style.display = 'none';
+      document.getElementById('results').style.display = 'block';
+      const btn = document.getElementById('analyzeBtn');
+      btn.disabled = false; document.getElementById('btnText').textContent = 'Generar Recomendaciones';
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      const form = document.getElementById('analysisForm');
+      form.addEventListener('submit', (e) => {
+        e.preventDefault();
+        try {
+          showLoading();
+          const params = {
+            location: document.getElementById('location').value.trim(),
+            environment: document.getElementById('environment').value,
+            pressure: parseInt(document.getElementById('pressure').value),
+            oilType: document.getElementById('oilType').value,
+            minBarrels: parseInt(document.getElementById('minBarrels').value),
+            maxBarrels: parseInt(document.getElementById('maxBarrels').value),
+            testDuration: parseInt(document.getElementById('testDuration').value)
+          };
+          if (params.maxBarrels < params.minBarrels) { alert('Los barriles máximos deben ser mayores o iguales a los mínimos'); hideLoading(); return; }
+          if (isNaN(params.pressure) || params.pressure <= 0) { alert('Por favor ingrese una presión válida'); hideLoading(); return; }
+
+          setTimeout(() => {
+            try {
+              // Actualizar la base de datos en caso de cambios
+              engine.refreshDatabase();
+              const recommendations = engine.analyze(params);
+              displayResults(recommendations, params);
+              hideLoading();
+            } catch (err) {
+              console.error(err); alert('Error al generar recomendaciones. Verifique los datos.'); hideLoading();
+            }
+          }, 400);
+        } catch (err) {
+          console.error(err); alert('Error al procesar los datos.'); hideLoading();
+        }
+      });
+    });
+
+    function thumbHTML(key, alt) {
+      const src = getImageSrc(key);
+      if (!src) return '';
+      // Imagen pequeña + tooltip grande
+      return `
+        <span class="thumb-wrap" aria-label="Vista previa">
+          <img class="thumb" src="${src}" alt="${alt}" onerror="this.style.visibility='hidden'" />
+          <span class="thumb-tooltip" role="tooltip">
+            <img src="${src}" alt="${alt}" onerror="this.parentElement.style.display='none'" />
+          </span>
+        </span>
+      `;
+    }
+
+    function displayResults(recommendations, params) {
+      const resultsDiv = document.getElementById('results');
+      let html = '';
+
+      const totalEquipment = recommendations.separators.length + recommendations.mpfm.length;
+      const totalTools = Object.values(recommendations.tools).reduce((sum, arr) => sum + arr.length, 0);
+
+      // Mostrar botones de exportación
+      document.getElementById('exportButtons').style.display = 'flex';
+
+      html += `
+        <div class="summary-box">
+          <div class="summary-item">
+            <span class="summary-number">${totalEquipment}</span>
+            <span class="summary-label">Equipos Principales</span>
+          </div>
+          <div class="summary-item">
+            <span class="summary-number">${totalTools}</span>
+            <span class="summary-label">Herramientas</span>
+          </div>
+          <div class="summary-item">
+            <span class="summary-number">${recommendations.alerts.length}</span>
+            <span class="summary-label">Alertas</span>
+          </div>
+        </div>`;
+
+      recommendations.alerts.forEach(alert => {
+        html += `<div class="alert alert-${alert.type}">${alert.message}</div>`;
+      });
+
+      if (recommendations.separators.length > 0) {
+        html += `
+          <div class="equipment-category">
+            <div class="category-header">
+              <span>Separadores Recomendados</span>
+              <span>${recommendations.separators.length} opciones</span>
+            </div>
+            <div class="category-content">`;
+        recommendations.separators.forEach((sep, index) => {
+          const badgeClass = index === 0 ? 'recommended-badge' : '';
+          const priority = index === 0 ? '⭐ RECOMENDADO' : `Opción ${index + 1}`;
+          html += `
+            <div class="equipment-item">
+              <div class="equipment-main">
+                ${thumbHTML(sep.id, sep.name)}
+                <div>
+                  <div class="equipment-name">${sep.name}${sep.special === 'offshore' ? ' · <small>Offshore</small>' : ''}</div>
+                  <div class="equipment-specs">
+                    Presión Trabajo: ${sep.workingPressure} PSI |
+                    Capacidad: ${sep.recommendedCapacity.toFixed(0)} BOPD |
+                    Tipo: ${sep.type} | Score: ${sep.suitabilityScore}
+                  </div>
+                </div>
+              </div>
+              <div class="quantity-badge ${badgeClass}">${priority}</div>
+            </div>`;
+        });
+        html += `</div></div>`;
+      }
+
+      if (recommendations.mpfm.length > 0) {
+        html += `
+          <div class="equipment-category">
+            <div class="category-header">
+              <span>Medidores Multifásicos (MPFM)</span>
+              <span>${recommendations.mpfm.length} opciones</span>
+            </div>
+            <div class="category-content">`;
+        recommendations.mpfm.forEach((mpfm, index) => {
+          const badgeClass = index === 0 ? 'recommended-badge' : '';
+          const priority = index === 0 ? '⭐ RECOMENDADO' : `Opción ${index + 1}`;
+          html += `
+            <div class="equipment-item">
+              <div class="equipment-main">
+                ${thumbHTML(mpfm.id, mpfm.name)}
+                <div>
+                  <div class="equipment-name">${mpfm.name}</div>
+                  <div class="equipment-specs">
+                    ID: ${mpfm.internalDiameter}mm |
+                    Presión Max: ${mpfm.maxPressure} PSI |
+                    Capacidad Max: ${mpfm.maxCapacity} BOPD |
+                    Incertidumbre Oil: ±${mpfm.uncertainty_oil}%
+                  </div>
+                </div>
+              </div>
+              <div class="quantity-badge ${badgeClass}">${priority}</div>
+            </div>`;
+        });
+        html += `
+            </div>
+            <div class="note-box">📝 <strong>Nota importante:</strong> Consultar gráfica envolvente específica para validar la capacidad final del MPFM según condiciones exactas de operación.</div>
+          </div>`;
+      }
+
+      const categoryNames = {
+        ajustes_medicion: 'Herramientas de Ajustes y Medición',
+        analisis_monitoreo: 'Equipos de Análisis y Monitoreo',
+        instalacion_operacion: 'Elementos de Instalación y Operación',
+        conexiones_acoplamiento: 'Piezas de Conexión y Acoplamiento',
+        suministro_electrico: 'Dispositivos de Suministro Eléctrico',
+        seguridad: 'Materiales de Seguridad',
+        administrativo: 'Elementos Administrativos',
+        especiales: 'Equipos Especiales'
+      };
+
+      Object.entries(recommendations.tools).forEach(([category, toolList]) => {
+        if (!toolList.length) return;
+        html += `
+          <div class="equipment-category">
+            <div class="category-header">
+              <span>${categoryNames[category]}</span>
+              <span>${toolList.length} elementos</span>
+            </div>
+            <div class="category-content">`;
+        toolList.forEach(tool => {
+          const maybeImg = getImageSrc(tool) ? thumbHTML(tool, tool) : '';
+          html += `
+            <div class="equipment-item">
+              <div class="equipment-main">
+                ${maybeImg}
+                <div class="equipment-name">${tool}</div>
+              </div>
+              <div class="quantity-badge">1</div>
+            </div>`;
+        });
+        html += `</div></div>`;
+      });
+
+      const oilTypeNames = {
+        ligero: 'Crudo Ligero (> 31.1° API)',
+        medio: 'Crudo Medio (22.0° - 29.9° API)',
+        pesado: 'Crudo Pesado (10.0° - 21.9° API)',
+        extrapesado: 'Crudo Extrapesado (< 10.0° API)'
+      };
+
+      html += `
+        <div class="note-box">
+          📋 <strong>Información adicional:</strong><br>
+          • Ubicación: ${params.location}<br>
+          • Tipo de medición: ${params.environment?.toUpperCase() || '—'}<br>
+          • Presión del yacimiento: ${params.pressure} PSI<br>
+          • Tipo de crudo: ${oilTypeNames[params.oilType] || params.oilType}<br>
+          • Rango de producción: ${params.minBarrels} - ${params.maxBarrels} BOPD<br>
+          • Duración estimada: ${params.testDuration} días<br><br>
+          Lista base recomendada. Ajuste según inventario local y condiciones específicas del pozo.
+        </div>`;
+
+      resultsDiv.innerHTML = html;
+      
+      // Guardar los resultados actuales para exportación
+      window.currentResults = recommendations;
+      window.currentParams = params;
+    }
+
+    // Auto-sugerencias de ubicación → tipo de crudo (como tenías)
+    document.addEventListener('DOMContentLoaded', function () {
+      const locationInput = document.getElementById('location');
+      const oilTypeSelect = document.getElementById('oilType');
+      if (locationInput && oilTypeSelect) {
+        locationInput.addEventListener('input', function () {
+          const location = this.value.toLowerCase();
+          if (!oilTypeSelect.value) {
+            if (location.includes('chaima') || location.includes('faja')) oilTypeSelect.value = 'extrapesado';
+            else if (location.includes('furrial') || location.includes('maracaibo')) oilTypeSelect.value = 'ligero';
+          }
+        });
+      }
+    });
+
+    // Validación en tiempo real de barriles
+    document.addEventListener('DOMContentLoaded', function () {
+      const minBarrelsInput = document.getElementById('minBarrels');
+      const maxBarrelsInput = document.getElementById('maxBarrels');
+      function validateBarrels() {
+        const minBarrels = parseInt(minBarrelsInput.value) || 0;
+        const maxBarrels = parseInt(maxBarrelsInput.value) || 0;
+        if (maxBarrels > 0 && maxBarrels < minBarrels) maxBarrelsInput.setCustomValidity('Los barriles máximos deben ser mayores o iguales a los mínimos');
+        else maxBarrelsInput.setCustomValidity('');
+      }
+      if (minBarrelsInput && maxBarrelsInput) {
+        minBarrelsInput.addEventListener('input', validateBarrels);
+        maxBarrelsInput.addEventListener('input', validateBarrels);
+      }
+    });
+
+    function resetForm() {
+      document.getElementById('analysisForm').reset();
+      document.getElementById('results').innerHTML = '<div class="no-results">Complete los parámetros y presione "Generar Recomendaciones" para ver los equipos sugeridos.</div>';
+      document.getElementById('exportButtons').style.display = 'none';
+    }
+
+    // ===== FUNCIONALIDADES NUEVAS =====
+    
+    // Exportar a CSV
+    document.getElementById('exportCSV').addEventListener('click', function() {
+      if (!window.currentResults) {
+        alert('No hay resultados para exportar. Genere recomendaciones primero.');
+        return;
+      }
+      
+      let csvContent = "Categoria,Equipo,Detalles,Cantidad\n";
+      
+      // Separadores
+      window.currentResults.separators.forEach(sep => {
+        const details = `Presión: ${sep.workingPressure} PSI, Capacidad: ${sep.recommendedCapacity.toFixed(0)} BOPD, Tipo: ${sep.type}`;
+        const priority = sep.suitabilityScore > 90 ? "RECOMENDADO" : "Alternativa";
+        csvContent += `Separadores,${sep.name},"${details}",${priority}\n`;
+      });
+      
+      // MPFM
+      window.currentResults.mpfm.forEach(mpfm => {
+        const details = `ID: ${mpfm.internalDiameter}mm, Presión Max: ${mpfm.maxPressure} PSI, Incertidumbre: ±${mpfm.uncertainty_oil}%`;
+        const priority = mpfm.suitabilityScore > 90 ? "RECOMENDADO" : "Alternativa";
+        csvContent += `MPFM,${mpfm.name},"${details}",${priority}\n`;
+      });
+      
+      // Herramientas
+      Object.entries(window.currentResults.tools).forEach(([category, tools]) => {
+        tools.forEach(tool => {
+          csvContent += `${category},${tool},,1\n`;
+        });
+      });
+      
+      // Crear y descargar archivo
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      const date = new Date().toISOString().slice(0, 10);
+      
+      link.setAttribute("href", url);
+      link.setAttribute("download", `inventario_recomendado_${date}.csv`);
+      link.style.visibility = 'hidden';
+      
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    });
+    
+    // Exportar a PDF
+    document.getElementById('exportPDF').addEventListener('click', function() {
+      if (!window.currentResults) {
+        alert('No hay resultados para exportar. Genere recomendaciones primero.');
+        return;
+      }
+      
+      try {
+        // Usar jsPDF
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF();
+        const date = new Date().toISOString().slice(0, 10);
+        let yPosition = 15;
+        
+        // Título
+        doc.setFontSize(18);
+        doc.text("Sistema de Inventariado Inteligente", 105, yPosition, { align: "center" });
+        yPosition += 10;
+        doc.setFontSize(14);
+        doc.text("Recomendaciones de Equipos - Well Testing", 105, yPosition, { align: "center" });
+        yPosition += 15;
+        
+        // Parámetros
+        doc.setFontSize(12);
+        doc.setFont(undefined, 'bold');
+        doc.text("Parámetros de la Prueba:", 14, yPosition);
+        yPosition += 7;
+        doc.setFont(undefined, 'normal');
+        const oilTypeNames = {
+          ligero: 'Crudo Ligero (> 31.1° API)',
+          medio: 'Crudo Medio (22.0° - 29.9° API)',
+          pesado: 'Crudo Pesado (10.0° - 21.9° API)',
+          extrapesado: 'Crudo Extrapesado (< 10.0° API)'
+        };
+        
+        doc.text(`Ubicación: ${window.currentParams.location}`, 20, yPosition);
+        yPosition += 6;
+        doc.text(`Tipo de Medición: ${window.currentParams.environment.toUpperCase()}`, 20, yPosition);
+        yPosition += 6;
+        doc.text(`Presión del Yacimiento: ${window.currentParams.pressure} PSI`, 20, yPosition);
+        yPosition += 6;
+        doc.text(`Tipo de Crudo: ${oilTypeNames[window.currentParams.oilType]}`, 20, yPosition);
+        yPosition += 6;
+        doc.text(`Rango de Producción: ${window.currentParams.minBarrels} - ${window.currentParams.maxBarrels} BOPD`, 20, yPosition);
+        yPosition += 6;
+        doc.text(`Duración Estimada: ${window.currentParams.testDuration} días`, 20, yPosition);
+        yPosition += 10;
+        
+        // Separadores recomendados
+        if (window.currentResults.separators.length > 0) {
+          if (yPosition > 240) { doc.addPage(); yPosition = 15; }
+          
+          doc.setFont(undefined, 'bold');
+          doc.text("Separadores Recomendados:", 14, yPosition);
+          yPosition += 7;
+          doc.setFont(undefined, 'normal');
+          
+          window.currentResults.separators.forEach((sep, idx) => {
+            if (yPosition > 270) { doc.addPage(); yPosition = 15; }
+            
+            const priority = idx === 0 ? "⭐ RECOMENDADO" : `Opción ${idx + 1}`;
+            doc.setFont(undefined, 'bold');
+            doc.text(`${sep.name} (${priority})`, 20, yPosition);
+            yPosition += 6;
+            doc.setFont(undefined, 'normal');
+            doc.text(`Presión Trabajo: ${sep.workingPressure} PSI, Capacidad: ${sep.recommendedCapacity.toFixed(0)} BOPD, Tipo: ${sep.type}, Score: ${sep.suitabilityScore}`, 20, yPosition);
+            yPosition += 8;
+          });
+          yPosition += 5;
+        }
+        
+        // MPFM recomendados
+        if (window.currentResults.mpfm.length > 0) {
+          if (yPosition > 240) { doc.addPage(); yPosition = 15; }
+          
+          doc.setFont(undefined, 'bold');
+          doc.text("Medidores Multifásicos (MPFM):", 14, yPosition);
+          yPosition += 7;
+          doc.setFont(undefined, 'normal');
+          
+          window.currentResults.mpfm.forEach((mpfm, idx) => {
+            if (yPosition > 270) { doc.addPage(); yPosition = 15; }
+            
+            const priority = idx === 0 ? "⭐ RECOMENDADO" : `Opción ${idx + 1}`;
+            doc.setFont(undefined, 'bold');
+            doc.text(`${mpfm.name} (${priority})`, 20, yPosition);
+            yPosition += 6;
+            doc.setFont(undefined, 'normal');
+            doc.text(`ID: ${mpfm.internalDiameter}mm, Presión Max: ${mpfm.maxPressure} PSI, Capacidad Max: ${mpfm.maxCapacity} BOPD, Incertidumbre Oil: ±${mpfm.uncertainty_oil}%`, 20, yPosition);
+            yPosition += 8;
+          });
+          yPosition += 5;
+        }
+        
+        // Nota final
+        if (yPosition > 250) { doc.addPage(); yPosition = 15; }
+        doc.setFont(undefined, 'italic');
+        doc.text("Nota: Lista base recomendada. Ajuste según inventario local y condiciones específicas del pozo.", 14, yPosition, { maxWidth: 180 });
+        
+        // Guardar PDF
+        doc.save(`recomendaciones_inventario_${date}.pdf`);
+      } catch (error) {
+        console.error("Error al generar PDF:", error);
+        alert("Error al generar el PDF. Asegúrese de que las bibliotecas necesarias estén cargadas.");
+      }
+    });
+    
+    // Gestión de inventario - Modal
+    const inventoryModal = document.getElementById('inventoryModal');
+    const jsonEditor = document.getElementById('jsonEditor');
+    
+    // Abrir modal
+    document.getElementById('manageInventory').addEventListener('click', function() {
+      // Cargar datos actuales en el editor
+      jsonEditor.value = JSON.stringify(getEquipmentDatabase(), null, 2);
+      inventoryModal.style.display = 'flex';
+    });
+    
+    // Cerrar modal
+    document.getElementById('closeModal').addEventListener('click', function() {
+      inventoryModal.style.display = 'none';
+    });
+    
+    // Cambiar pestañas
+    document.querySelectorAll('.modal-tab').forEach(tab => {
+      tab.addEventListener('click', function() {
+        // Desactivar todas las pestañas
+        document.querySelectorAll('.modal-tab').forEach(t => t.classList.remove('active'));
+        document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+        
+        // Activar la pestaña clickeada
+        this.classList.add('active');
+        document.getElementById(this.dataset.tab + 'Tab').classList.add('active');
+      });
+    });
+    
+    // Guardar cambios en el inventario
+    document.getElementById('saveInventory').addEventListener('click', function() {
+      try {
+        const newData = JSON.parse(jsonEditor.value);
+        saveEquipmentDatabase(newData);
+        alert('Inventario actualizado correctamente.');
+        inventoryModal.style.display = 'none';
+        
+        // Actualizar el motor de recomendaciones
+        engine.refreshDatabase();
+      } catch (error) {
+        alert('Error: El formato JSON no es válido. Por favor, verifique la sintaxis.');
+        console.error(error);
+      }
+    });
+    
+    // Restablecer valores predeterminados
+    document.getElementById('resetInventory').addEventListener('click', function() {
+      if (confirm('¿Está seguro de que desea restablecer los valores predeterminados? Se perderán todos los cambios personalizados.')) {
+        localStorage.removeItem('equipmentDatabase');
+        jsonEditor.value = JSON.stringify(defaultEquipmentDatabase, null, 2);
+        alert('Valores predeterminados restablecidos.');
+      }
+    });
+  </script>
+</body>
+</html>
